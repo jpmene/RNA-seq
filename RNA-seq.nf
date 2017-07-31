@@ -9,6 +9,7 @@ params.annotation = "/home/jp/featurecount/data/Homo_sapiens.GRCh38.89.gtf"
 params.compare = null
 params.index = null
 params.featurecount = "/home/jp/featurecount/feauturecount.nf"
+params.tophat2 = "tophat2"
 
 
 //print usage
@@ -38,6 +39,7 @@ if (params.help) {
 genome_file = file(params.genome)
 annotation_file = file(params.annotation)
 featurecount= params.featurecount
+tophat2= params.tophat2
 /*
 *Path to the tool trimmomatic (need the adapters file)
 */
@@ -136,7 +138,7 @@ process mapping {
     set pair_id, "$pair_id" into bam
 
     """
-    tophat2 -p ${task.cpus} genome.index $reads
+    ${tophat2} -p ${task.cpus} genome.index $reads
     mv tophat_out/accepted_hits.bam ./$pair_id
     """
 }
