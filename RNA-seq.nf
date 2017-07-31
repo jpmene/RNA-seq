@@ -8,6 +8,8 @@ params.genome = "$baseDir/data/GRCh37_region1.fasta"
 params.annotation = "/home/jp/featurecount/data/Homo_sapiens.GRCh38.89.gtf"
 params.compare = null
 params.index = null
+params.featurecount = "/home/jp/featurecount/feauturecount.nf"
+
 
 //print usage
 if (params.help) {
@@ -35,7 +37,7 @@ if (params.help) {
 */
 genome_file = file(params.genome)
 annotation_file = file(params.annotation)
-
+featurecount= params.featurecount
 /*
 *Path to the tool trimmomatic (need the adapters file)
 */
@@ -162,7 +164,7 @@ if(params.compare == null){
         set pair_id, "count" into count 
 
         """
-        nextflow /home/jp/featurecount/feauturecount.nf \
+        nextflow ${featurecount} \
         --file_bam ${bam_file} \
         --annotation ${annotation} \
         --name_dir ${pair_id} \
@@ -173,7 +175,7 @@ if(params.compare == null){
         mv result/featureCounts/$pair_id/* count/.
         """
     }
-    }
+}
 else{
 
 
@@ -182,6 +184,8 @@ else{
                 .map { file -> tuple(file.baseName, file) }
 
     list_bam = bam_count.combine(compare_bam,by:0)
+
+
 
     process count_and_compare {
         tag "$pair_id"
@@ -195,7 +199,7 @@ else{
         set pair_id, "count" into count 
 
         """
-        nextflow /home/jp/featurecount/feauturecount.nf \
+        nextflow ${featurecount} \
         --file_bam ${bam_file} \
         --annotation ${annotation} \
         --name_dir ${pair_id} \
