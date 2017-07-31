@@ -73,7 +73,7 @@ process trimming{
 * Control Quality of original read_pairs
 */
 process fastQC {
-    cpus 2
+    cpus 4
     tag{pair_id}
     publishDir "result/RNA-seq/$pair_id/QC/", mode: "move"
     
@@ -111,8 +111,11 @@ if(params.index == null){
     }
 }
  else{
-    genome_index = Channel.fromPath(params.index)
+    genome_index =  Channel
+                .fromPath(params.index).toList()
 }
+
+//genome_index.subscribe { println "D: $it" }
 
 /*
  * Step 2. Maps each read-pair by using Tophat2 mapper tool
@@ -120,7 +123,7 @@ if(params.index == null){
 process mapping {
     tag "$pair_id"
     publishDir "result/RNA-seq/$pair_id/bam/", mode: "copy"
-    cpus 2
+    cpus 4
     input:
     file genome from genome_file 
     file index from genome_index
