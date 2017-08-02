@@ -135,15 +135,15 @@ process mapping {
  
     output:
     set pair_id, "tophat_out" into log_map
-    set pair_id, "$pair_id" into bam
+    set pair_id, "${pair_id}.bam" into bam
 
     """
     ${tophat2} -p ${task.cpus} genome.index $reads
-    mv tophat_out/accepted_hits.bam ./$pair_id
+    mv tophat_out/accepted_hits.bam ./${pair_id}.bam
     """
 }
 
-
+/*
 bam.into{
     bam_count
     bam_transcipt
@@ -217,7 +217,7 @@ else{
 }
 
 
-
+*/
 
 /*
  * Step 3. Assembles the transcript by using the "cufflinks" tool
