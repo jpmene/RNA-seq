@@ -4,12 +4,12 @@
 *params input 
 */
 params.reads = "$baseDir/data/*{1,2}.fastq"
-params.genome = "$baseDir/data/GRCh37_region1.fasta"
+params.genome = "$baseDir/data/GRCh37_region1.fa"
 params.annotation = "/home/jp/featurecount/data/Homo_sapiens.GRCh38.89.gtf"
 params.compare = null
 params.index = null
 params.featurecount = "/home/jp/featurecount/feauturecount.nf"
-params.tophat2 = "tophat2"
+
 
 
 //print usage
@@ -39,7 +39,7 @@ if (params.help) {
 genome_file = file(params.genome)
 annotation_file = file(params.annotation)
 featurecount= params.featurecount
-tophat2= params.tophat2
+
 /*
 *Path to the tool trimmomatic (need the adapters file)
 */
@@ -76,6 +76,7 @@ process trimming{
 /*
 * Control Quality of original read_pairs
 */
+
 process fastQC {
     cpus 4
     tag{pair_id}
@@ -107,10 +108,10 @@ if(params.index == null){
         file genome from genome_file
      
         output:
-        file 'genome.index*' into genome_index
+        file '*' into genome_index
        
         """
-        bowtie2-build ${genome} genome.index
+        bowtie2-build ${genome} $genome.baseName
         """
     }
 }
@@ -119,7 +120,6 @@ if(params.index == null){
                 .fromPath(params.index).toList()
 }
 
-//genome_index.subscribe { println "D: $it" }
 
 /*
  * Step 2. Maps each read-pair by using Tophat2 mapper tool
@@ -138,7 +138,7 @@ process mapping {
     set pair_id, "${pair_id}.bam" into bam
 
     """
-    ${tophat2} -p ${task.cpus} genome.index $reads
+    tophat2 -p ${task.cpus} $genome.baseName $reads
     mv tophat_out/accepted_hits.bam ./${pair_id}.bam
     """
 }
