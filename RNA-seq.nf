@@ -141,7 +141,7 @@ process mapping {
     set pair_id, "${pair_id}.bam" into bam
 
     """
-    tophat2 -p ${task.cpus} --GTF ${annotation} $genome.baseName $reads
+    tophat2 -p ${task.cpus} -r 100 --GTF ${annotation} $genome.baseName $reads
     mv tophat_out/accepted_hits.bam ./${pair_id}.bam
     """
 }
