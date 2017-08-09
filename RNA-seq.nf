@@ -5,10 +5,9 @@
 */
 params.reads = "$baseDir/data/*{1,2}.fastq"
 params.genome = "$baseDir/data/GRCh37_region1.fa"
-params.annotation = "/home/jp/featurecount/data/Homo_sapiens.GRCh38.89.gtf"
-params.compare = null
+params.annotation = "$baseDir/data/*.gtf"
 params.index = null
-params.featurecount = "/home/jp/featurecount/feauturecount.nf"
+//params.featurecount = "/home/jp/featurecount/feauturecount.nf"
 
 
 
@@ -20,15 +19,16 @@ if (params.help) {
     log.info '.'
     log.info ''
     log.info 'Usage: '
-    log.info '    nextflow RNA-seq.nf --file_bam_compare ../file.bam --type_data Illumina'
-    log.info '            --name_dir toto --annotation file.gtf --path_featurecounts /bin/featureCqounts '
+    log.info '    nextflow RNA-seq.nf --genome PATH/genome.fa --reads "PATH/*{1,2}.fq" '
+    log.info ' Or '
+    log.info ' nextflow RNA-seq.nf --genome PATH/genome.fa  --index "PATH/genome*" --reads "PATH/*{1,2}.fq" '
     log.info ''
     log.info 'Options:'
     log.info '    --help                              Show this message and exit.'
     log.info '    --reads                             File reads paired in fastq [ex : "data/*_{1,2}.{fastq,fq}"'
-    log.info '    --genome GENOME_FILE                Reference genome file(s).'
-    log.info '    --annotation ANNOTATION_FILE        Annotation genome use in GTF .'
-    log.info '    --index GENOME_INDEX_FILE           Index file.[Optional but most faster].'   
+    log.info '    --genome GENOME_FILE                Reference genome file in fomrat .fa  .'
+    log.info '    --index GENOME_INDEX_FILE           Index file with the same prefix of genome reference '
+    log.info '                                        (ex : --genome PATH/hg19.fa --index "PATH/hg19*").[Optional but most faster].'   
     exit 1
 }
 
@@ -38,7 +38,7 @@ if (params.help) {
 */
 genome_file = file(params.genome)
 annotation_file = file(params.annotation)
-featurecount= params.featurecount
+//featurecount= params.featurecount
 
 /*
 *Path to the tool trimmomatic (need the adapters file)
@@ -122,106 +122,114 @@ if(params.index == null){
 
 
 /*
- * Step 2. Maps each read-pair by using Tophat2 mapper tool
+ * Step 2. Maps each read-pair by using Tophat2.1.1 mapper tool
  */
 process mapping {
+
     tag "$pair_id"
     publishDir "result/RNA-seq/$pair_id/bam/", mode: "copy"
     cpus 4
+
     input:
     file genome from genome_file 
     file index from genome_index
     set pair_id, file(reads) from read_pairs_map
+    file annotation from annotation_file
  
     output:
     set pair_id, "tophat_out" into log_map
     set pair_id, "${pair_id}.bam" into bam
 
     """
-    tophat2 -p ${task.cpus} $genome.baseName $reads
+    tophat2 -p ${task.cpus} --GTF ${annotation} $genome.baseName $reads
     mv tophat_out/accepted_hits.bam ./${pair_id}.bam
     """
 }
 
-/*
+
 bam.into{
-    bam_count
-    bam_transcipt
-    bam_diff  
+    bam_count_gene
+    bam_count_exon
+    bam_count_transcript  
 } 
 
 
-
-if(params.compare == null){
-
-    process count {
-        tag "$pair_id"
-        publishDir "result/RNA-seq/$pair_id/", mode: "copy"
-           
-        input:
-        set pair_id, file(bam_file) from bam_count
-        file annotation from annotation_file
-     
-        output:
-        set pair_id, "count" into count 
-
-        """
-        nextflow ${featurecount} \
-        --file_bam ${bam_file} \
-        --annotation ${annotation} \
-        --name_dir ${pair_id} \
-        --path_featurecounts '/bin/featureCqounts' \
-        --type_data Illumina \
-
-        mkdir count
-        mv result/featureCounts/$pair_id/* count/.
-        """
-    }
-}
-else{
-
-
-    compare_bam =  Channel
-                .fromPath(params.compare)
-                .map { file -> tuple(file.baseName, file) }
-
-    list_bam = bam_count.combine(compare_bam,by:0)
-
-
-
-    process count_and_compare {
-        tag "$pair_id"
-        publishDir "result/RNA-seq/$pair_id/", mode: "copy"
+process count_gene {
+    tag "$pair_id"
+    publishDir "result/RNA-seq/$pair_id/count", mode: "copy"
        
-        input:
-        set pair_id, file(bam_file) , file (bam_comapre) from list_bam
-        file annotation from annotation_file
+    input:
+    set pair_id, file (bam_file) from bam_count_gene
+    file annotation from annotation_file
      
-        output:
-        set pair_id, "count" into count 
+    output: 
 
-        """
-        nextflow ${featurecount} \
-        --file_bam ${bam_file} \
-        --annotation ${annotation} \
-        --name_dir ${pair_id} \
-        --path_featurecounts '/bin/featureCqounts' \
-        --type_data Illumina \
-        --file_bam_compare ${bam_comapre}
+    file "${pair_id}_gene" into count_gene 
+    file "*.summary" into summary_gene 
 
-        mkdir count
-        mv result/featureCounts/$pair_id/* count/.
-        """
-    }
 
+    """
+    featureCounts -T ${task.cpus} \
+    -p -M -O --largestOverlap -s 2 -f \
+    -t gene -g gene_id \
+    -a ${annotation} \
+    -o ${pair_id}_gene ${bam_file} \
+    """    
+}
+
+process count_exon {
+    tag "$pair_id"
+    publishDir "result/RNA-seq/$pair_id/count", mode: "copy"
+       
+    input:
+    set pair_id, file (bam_file) from bam_count_exon
+    file annotation from annotation_file
+     
+    output: 
+
+    file "${pair_id}_exon" into count_exon 
+    file "*.summary" into summary_exon 
+
+
+    """
+    featureCounts -T ${task.cpus} \
+    -p -M -O --largestOverlap -s 2 -f \
+    -t exon -g exon_id \
+    -a ${annotation} \
+    -o ${pair_id}_exon ${bam_file} \
+    """    
+}
+
+process count_transcript {
+    tag "$pair_id"
+    publishDir "result/RNA-seq/$pair_id/count", mode: "copy"
+       
+    input:
+    set pair_id, file (bam_file) from bam_count_transcript
+    file annotation from annotation_file
+     
+    output: 
+
+    file "${pair_id}_transcript" into count_transcript 
+    file "*.summary" into summary_transcript 
+
+
+    """
+    featureCounts -T ${task.cpus} \
+    -p -M -O --largestOverlap -s 2 -f \
+    -t transcript -g transcript_id \
+    -a ${annotation} \
+    -o ${pair_id}_transcript ${bam_file} \
+    """    
 }
 
 
-*/
+
 
 /*
  * Step 3. Assembles the transcript by using the "cufflinks" tool
  */
+ 
 /* 
 process cufflinks {
     cpus 2
@@ -259,7 +267,7 @@ process list_GTF {
 
 
 process cuffmerge {
-    cpus 2
+    cpus 4
     publishDir "result/RNA-seq/$genome_file/merge/", mode: "copy"
        
     input:
@@ -279,7 +287,7 @@ process cuffmerge {
 
 
 process cuffdiff {
-    cpus 2
+    cpus 4
     publishDir "result/RNA-seq/$pair_id/merge", mode: "copy"
        
     input:
@@ -295,8 +303,8 @@ process cuffdiff {
     mv * cuffdiff/
     """
 }
-
 */
+
 workflow.onComplete { 
     println ( workflow.success ? "Done!" : "Oops .. something went wrong" )
 }
