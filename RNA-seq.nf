@@ -5,7 +5,7 @@
 */
 params.reads = "$baseDir/data/*{1,2}.fastq"
 params.genome = "$baseDir/data/GRCh37_region1.fa"
-params.annotation = "$baseDir/data/*.gtf"
+params.annotation = "$baseDir/data/GRCh37_region1.gtf"
 params.index = null
 //params.featurecount = "/home/jp/featurecount/feauturecount.nf"
 
@@ -121,6 +121,27 @@ if(params.index == null){
 }
 
 
+
+
+process build_transcriptome_index{
+
+    tag "$genome"
+    publishDir "result/RNA-seq/$pair_id/bam/", mode: "copy"
+    cpus 4
+
+    input:
+    file genome from genome_file 
+    file index from genome_index
+    file annotation from annotation_file
+ 
+    output:
+    file  '*_tr' into transcriptome_index
+
+    """
+    tophat2 -p ${task.cpus} --GTF ${annotation} \
+    --transcriptome-index=${genome.baseName}_tr $genome.baseName
+    """
+}
 /*
  * Step 2. Maps each read-pair by using Tophat2.1.1 mapper tool
  */
@@ -133,6 +154,7 @@ process mapping {
     input:
     file genome from genome_file 
     file index from genome_index
+    file index_tr from transcriptome_index
     set pair_id, file(reads) from read_pairs_map
     file annotation from annotation_file
  
@@ -141,7 +163,10 @@ process mapping {
     set pair_id, "${pair_id}.bam" into bam
 
     """
-    tophat2 -p ${task.cpus} -r 100 --GTF ${annotation} $genome.baseName $reads
+    tophat2 -p ${task.cpus} -r 100 --GTF ${annotation} \
+    --transcriptome-index=$index_tr \
+    $genome.baseName $reads 
+
     mv tophat_out/accepted_hits.bam ./${pair_id}.bam
     """
 }
@@ -154,77 +179,31 @@ bam.into{
 } 
 
 
-process count_gene {
-    tag "$pair_id"
+methods = ['gene', 'exon', 'transcript']
+
+process count {
+    tag "$pair_id,$mode"
     publishDir "result/RNA-seq/$pair_id/count", mode: "copy"
        
     input:
     set pair_id, file (bam_file) from bam_count_gene
     file annotation from annotation_file
+    each mode from methods
      
     output: 
 
-    file "${pair_id}_gene" into count_gene 
+    file "${pair_id}_${mode}" into count_gene 
     file "*.summary" into summary_gene 
 
 
     """
     featureCounts -T ${task.cpus} \
     -p -M -O --largestOverlap -s 2 -f \
-    -t gene -g gene_id \
+    -t ${mode} -g ${mode}_id \
     -a ${annotation} \
-    -o ${pair_id}_gene ${bam_file} \
+    -o ${pair_id}_${mode} ${bam_file} \
     """    
 }
-
-process count_exon {
-    tag "$pair_id"
-    publishDir "result/RNA-seq/$pair_id/count", mode: "copy"
-       
-    input:
-    set pair_id, file (bam_file) from bam_count_exon
-    file annotation from annotation_file
-     
-    output: 
-
-    file "${pair_id}_exon" into count_exon 
-    file "*.summary" into summary_exon 
-
-
-    """
-    featureCounts -T ${task.cpus} \
-    -p -M -O --largestOverlap -s 2 -f \
-    -t exon -g exon_id \
-    -a ${annotation} \
-    -o ${pair_id}_exon ${bam_file} \
-    """    
-}
-
-process count_transcript {
-    tag "$pair_id"
-    publishDir "result/RNA-seq/$pair_id/count", mode: "copy"
-       
-    input:
-    set pair_id, file (bam_file) from bam_count_transcript
-    file annotation from annotation_file
-     
-    output: 
-
-    file "${pair_id}_transcript" into count_transcript 
-    file "*.summary" into summary_transcript 
-
-
-    """
-    featureCounts -T ${task.cpus} \
-    -p -M -O --largestOverlap -s 2 -f \
-    -t transcript -g transcript_id \
-    -a ${annotation} \
-    -o ${pair_id}_transcript ${bam_file} \
-    """    
-}
-
-
-
 
 /*
  * Step 3. Assembles the transcript by using the "cufflinks" tool
