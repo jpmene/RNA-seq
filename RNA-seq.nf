@@ -78,7 +78,7 @@ process trimming{
 */
 
 process fastQC {
-    cpus 4
+    
     tag{pair_id}
     publishDir "result/RNA-seq/$pair_id/QC/", mode: "move"
     
@@ -94,14 +94,14 @@ process fastQC {
 }
 
 /*
- * Step 1. Builds the genome index required by the mapping process
+ * Step 1.0 Builds the genome index required by the mapping process
  */
 
 if(params.index == null){
 
 
     process buildIndex {
-        cpus 4
+        
         tag "$genome_file.baseName"
     
         input:
@@ -122,12 +122,15 @@ if(params.index == null){
 
 
 
+/*
+ * Step 1.1 Builds the strascipt index required by the mapping process
+ */
 
 process build_transcriptome_index{
 
     tag "$genome"
     publishDir "result/RNA-seq/$pair_id/bam/", mode: "copy"
-    cpus 4
+    
 
     input:
     file genome from genome_file 
@@ -142,6 +145,7 @@ process build_transcriptome_index{
     --transcriptome-index=${genome.baseName}_tr $genome.baseName
     """
 }
+
 /*
  * Step 2. Maps each read-pair by using Tophat2.1.1 mapper tool
  */
@@ -149,7 +153,7 @@ process mapping {
 
     tag "$pair_id"
     publishDir "result/RNA-seq/$pair_id/bam/", mode: "copy"
-    cpus 4
+    
 
     input:
     file genome from genome_file 
@@ -184,6 +188,7 @@ methods = ['gene', 'exon', 'transcript']
 process count {
     tag "$pair_id,$mode"
     publishDir "result/RNA-seq/$pair_id/count", mode: "copy"
+    
        
     input:
     set pair_id, file (bam_file) from bam_count_gene
@@ -246,7 +251,7 @@ process list_GTF {
 
 
 process cuffmerge {
-    cpus 4
+    //cpus 4
     publishDir "result/RNA-seq/$genome_file/merge/", mode: "copy"
        
     input:
@@ -266,7 +271,7 @@ process cuffmerge {
 
 
 process cuffdiff {
-    cpus 4
+    //cpus 4
     publishDir "result/RNA-seq/$pair_id/merge", mode: "copy"
        
     input:
