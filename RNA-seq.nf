@@ -7,7 +7,7 @@ params.reads = "$baseDir/data/*{1,2}.fastq"
 params.genome = "$baseDir/data/GRCh37_region1.fa"
 params.annotation = "$baseDir/data/GRCh37_region1.gtf"
 params.index = null
-//params.featurecount = "/home/jp/featurecount/feauturecount.nf"
+
 
 
 
@@ -26,7 +26,8 @@ if (params.help) {
     log.info 'Options:'
     log.info '    --help                              Show this message and exit.'
     log.info '    --reads                             File reads paired in fastq [ex : "data/*_{1,2}.{fastq,fq}"'
-    log.info '    --genome GENOME_FILE                Reference genome file in fomrat .fa  .'
+    log.info '    --genome GENOME_FILE                Reference genome file in fomrat fa .'
+    log.info '    --annotation ANNOTATION_FILE        Annotation file in format GTF .'
     log.info '    --index GENOME_INDEX_FILE           Index file with the same prefix of genome reference '
     log.info '                                        (ex : --genome PATH/hg19.fa --index "PATH/hg19*").[Optional but most faster].'   
     exit 1
@@ -34,14 +35,14 @@ if (params.help) {
 
 
 /*
-*create a read_pairs by params.reads and genome ref 
+*Path of genome file and annotation file   
 */
 genome_file = file(params.genome)
 annotation_file = file(params.annotation)
-//featurecount= params.featurecount
+
 
 /*
-*Path to the tool trimmomatic (need the adapters file)
+*Channel for reads pairs   
 */
 Channel
     .fromFilePairs( params.reads )                                             
@@ -55,26 +56,9 @@ read_pairs.into{
 
 
 
-/*
-* Trimming of read_pairs
-*/
-/*
-process trimming{
-    tag{pair_id}
-
-    input:
-    set pair_id, file(reads) from read_pairs2 
-
-    output: 
-    set pair_id, '*trim.fq'  into read_pairs_trim
-    """
-    java -jar $trimmomatic/trimmomatic-0.36.jar PE -phred33 ${reads} $pair_id'_1_trim.fq' $pair_id'_1_unp.fq' $pair_id'_2_trim.fq' $pair_id'_2_unp.fq' ILLUMINACLIP:$trimmomatic/adapters/TruSeq3-PE.fa:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
-    """
-}
-*/
 
 /*
-* Control Quality of original read_pairs
+* Control Quality of original read_pairs by fastQC
 */
 
 process fastQC {
@@ -94,7 +78,7 @@ process fastQC {
 }
 
 /*
- * Step 1.0 Builds the genome index required by the mapping process
+ * Step 1.0 : Builds the genome index required by the mapping process.
  */
 
 if(params.index == null){
@@ -123,7 +107,7 @@ if(params.index == null){
 
 
 /*
- * Step 1.1 Builds the strascipt index required by the mapping process
+ * Step 1.1 : Builds the transcript index, required by the mapping process.
  */
 
 process build_transcriptome_index{
@@ -147,14 +131,19 @@ process build_transcriptome_index{
 }
 
 /*
- * Step 2. Maps each read-pair by using Tophat2.1.1 mapper tool
+* Step 2. : Maps each read-pair by using Tophat2.1.1 mapper tool
+*OPTION :
+*
+*-p     Use this many threads to align reads.
+*-r     This is the expected (mean) inner distance between mate pairs.
+*--gtf  Annotation file in GTF (see doc of tophat2.1.1)
+*--transcriptome-index=     Name of annotation index (see doc of tophat2.1.1)
  */
 process mapping {
 
     tag "$pair_id"
     publishDir "result/RNA-seq/$pair_id/bam/", mode: "copy"
     
-
     input:
     file genome from genome_file 
     file index from genome_index
@@ -182,7 +171,26 @@ bam.into{
     bam_count_transcript  
 } 
 
+/*
+* Step 3. : Count the transcript by using the "featureCounts" tool
+*OPTION :
+* 
+*-T     Number of the threads. 1 by default.
+*-p     Count fragments (read pairs) instead of individual reads
+*-M     Multi-mapping reads will also be counted. For a multi-mapping read,
+*       all its reported alignments will be counted
+*-largestOverlap    Assign reads to a meta-feature/feature that has the largest number of overlapping bases.
+*-t     Specify feature type in GTF annotation. `exon' by default.
+*-g     Specify attribute type in GTF annotation. `gene_id' by default.
+*-a     Name of an annotation file. GTF format by default.
+*-o     Name of the output file including read counts.
+*-O     Assign reads to all their overlapping meta-features
+*-s     Perform strand-specific read counting. Possible values:  
+*           0 (unstranded), 1 (stranded) and 2 (reversely stranded).
+*-f     Perform read counting at feature level (eg. counting reads for exons rather than genes). 
+*/
 
+ 
 methods = ['gene', 'exon', 'transcript']
 
 process count {
@@ -209,6 +217,7 @@ process count {
     -o ${pair_id}_${mode} ${bam_file} \
     """    
 }
+
 
 /*
  * Step 3. Assembles the transcript by using the "cufflinks" tool
