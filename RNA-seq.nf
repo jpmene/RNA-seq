@@ -110,7 +110,7 @@ if(params.index == null){
  * Step 1.1 : Builds the transcript index, required by the mapping process.
  */
 
-process build_transcriptome_index{
+process buildTranscriptomeIndex{
 
     tag "$genome"
     publishDir "result/RNA-seq/$pair_id/bam/", mode: "copy"
@@ -138,6 +138,10 @@ process build_transcriptome_index{
 *-r     This is the expected (mean) inner distance between mate pairs.
 *--gtf  Annotation file in GTF (see doc of tophat2.1.1)
 *--transcriptome-index=     Name of annotation index (see doc of tophat2.1.1)
+*--coverage-search      Enables the coverage based search for junctions. Use when coverage 
+*    search is disabled by default (such as for reads 75bp or longer), for maximum sensitivity.
+*--microexon-search       With this option, the pipeline will attempt to find 
+*    alignments incident to micro-exons. Works only for reads 50bp or longer.
  */
 process mapping {
 
@@ -158,6 +162,7 @@ process mapping {
     """
     tophat2 -p ${task.cpus} -r 100 --GTF ${annotation} \
     --transcriptome-index=$index_tr \
+    --coverage-search --microexon-search \
     $genome.baseName $reads 
 
     mv tophat_out/accepted_hits.bam ./${pair_id}.bam
