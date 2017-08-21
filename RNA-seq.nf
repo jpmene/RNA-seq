@@ -6,6 +6,7 @@
 params.reads = "$baseDir/data/*{1,2}.fastq"
 params.genome = "$baseDir/data/GRCh37_region1.fa"
 params.annotation = "$baseDir/data/GRCh37_region1.gtf"
+params.output_dir = "data"
 params.index = null
 
 
@@ -64,7 +65,7 @@ read_pairs.into{
 process fastQC {
     
     tag{pair_id}
-    publishDir "result/RNA-seq/$pair_id/QC/", mode: "move"
+    publishDir "result/RNA-seq/$params.output_dir/$pair_id/QC/", mode: "move"
     
     input:
     set pair_id, file(reads) from read_pairs_qc 
@@ -113,7 +114,7 @@ if(params.index == null){
 process buildTranscriptomeIndex{
 
     tag "$genome"
-    publishDir "result/RNA-seq/$pair_id/bam/", mode: "copy"
+    publishDir "result/RNA-seq/$params.output_dir/$pair_id/bam/", mode: "copy"
     
 
     input:
@@ -146,7 +147,7 @@ process buildTranscriptomeIndex{
 process mapping {
 
     tag "$pair_id"
-    publishDir "result/RNA-seq/$pair_id/bam/", mode: "copy"
+    publishDir "result/RNA-seq/$params.output_dir/$pair_id/bam/", mode: "copy"
     
     input:
     file genome from genome_file 
@@ -200,7 +201,7 @@ methods = ['gene', 'exon', 'transcript']
 
 process count {
     tag "$pair_id,$mode"
-    publishDir "result/RNA-seq/$pair_id/count", mode: "copy"
+    publishDir "result/RNA-seq/$params.output_dir/$pair_id/count", mode: "copy"
     
        
     input:
