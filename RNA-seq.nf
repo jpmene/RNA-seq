@@ -162,7 +162,7 @@ process mapping {
     """
     tophat2 -p ${task.cpus} -r 100 --GTF ${annotation} \
     --transcriptome-index=$index_tr \
-    --coverage-search --microexon-search \
+    --microexon-search \
     $genome.baseName $reads 
 
     mv tophat_out/accepted_hits.bam ./${pair_id}.bam
